@@ -33,12 +33,20 @@
 #include "subsystems/ahrs.h"
 #include "subsystems/ins.h"
 #include "firmwares/rotorcraft/navigation.h"
+//h2w
+#include "modules/opticflow/opticflow_ADNS3080.h"
+#include "subsystems/datalink/downlink.h"
+#include "messages.h"
+#include "mcu_periph/uart.h"
 
 #include "generated/airframe.h"
 
 uint8_t guidance_h_mode;
 
 struct Int32Vect2 guidance_h_pos_sp;
+struct Int8Vect2 guidance_h_OF_sp; //h2w
+struct Int8Vect2 guidance_h_dOF_sp; //h2w
+int32_t           guidance_h_psi_sp;
 struct Int32Vect2 guidance_h_pos_ref;
 struct Int32Vect2 guidance_h_speed_ref;
 struct Int32Vect2 guidance_h_accel_ref;
@@ -46,6 +54,9 @@ struct Int32Vect2 guidance_h_accel_ref;
 struct Int32Vect2 guidance_h_pos_err;
 struct Int32Vect2 guidance_h_speed_err;
 struct Int32Vect2 guidance_h_pos_err_sum;
+struct Int8Vect2 guidance_h_OF_err;//h2w
+struct Int8Vect2 guidance_h_dOF_err;//h2w
+struct Int32Vect2 guidance_h_OF_err_sum;//h2w
 struct Int32Vect2 guidance_h_nav_err;
 
 struct Int32Eulers guidance_h_rc_sp;
@@ -58,10 +69,18 @@ int32_t guidance_h_dgain;
 int32_t guidance_h_igain;
 int32_t guidance_h_again;
 
+//h2w
+uint8_t guidance_h_of_dgain;
+uint8_t guidance_h_of_ddgain;
+#define INT8_OF_FRAC 2
+//INT8_OF_FRAC supposed to be 5
+
 /* warn if some gains are still negative */
 #if (GUIDANCE_H_PGAIN < 0) || \
   (GUIDANCE_H_DGAIN < 0)   || \
-  (GUIDANCE_H_IGAIN < 0)
+  (GUIDANCE_H_IGAIN < 0)   || \
+  (GUIDANCE_H_OF_DGAIN < 0)|| \
+  (GUIDANCE_H_OF_DDGAIN < 0)
 #warning "ALL control gains are now positive!!!"
 #endif
 
@@ -80,7 +99,9 @@ int32_t guidance_h_again;
 
 static inline void guidance_h_update_reference(bool_t use_ref);
 static inline void guidance_h_traj_run(bool_t in_flight);
+static inline void guidance_h_traj_run_OF(bool_t in_flight);//h2w
 static inline void guidance_h_hover_enter(void);
+static inline void guidance_h_hover_enter_OF(void);//h2w
 static inline void guidance_h_nav_enter(void);
 
 #define GuidanceHSetRef(_pos, _speed, _accel) { \
@@ -91,18 +112,24 @@ static inline void guidance_h_nav_enter(void);
   }
 
 
+ 
 void guidance_h_init(void) {
 
   guidance_h_mode = GUIDANCE_H_MODE_KILL;
+  guidance_h_psi_sp = 0;
   INT_VECT2_ZERO(guidance_h_pos_sp);
+  INT_VECT2_ZERO(guidance_h_OF_sp); //h2w
+  INT_VECT2_ZERO(guidance_h_dOF_sp); //h2w
   INT_VECT2_ZERO(guidance_h_pos_err_sum);
+  INT_VECT2_ZERO(guidance_h_OF_err_sum); //h2w
   INT_EULERS_ZERO(guidance_h_rc_sp);
   INT_EULERS_ZERO(guidance_h_command_body);
   guidance_h_pgain = GUIDANCE_H_PGAIN;
   guidance_h_igain = GUIDANCE_H_IGAIN;
   guidance_h_dgain = GUIDANCE_H_DGAIN;
   guidance_h_again = GUIDANCE_H_AGAIN;
-
+  guidance_h_of_dgain = GUIDANCE_H_OF_DGAIN;//h2w
+  guidance_h_of_ddgain = GUIDANCE_H_OF_DDGAIN;//h2w
 }
 
 
@@ -130,6 +157,10 @@ void guidance_h_mode_changed(uint8_t new_mode) {
 
   case GUIDANCE_H_MODE_NAV:
     guidance_h_nav_enter();
+    break;
+    //h2w
+  case GUIDANCE_H_MODE_HOVER_OF:
+    guidance_h_hover_enter_OF();
     break;
   default:
     break;
@@ -159,10 +190,15 @@ void guidance_h_read_rc(bool_t  in_flight) {
   case GUIDANCE_H_MODE_HOVER:
     stabilization_attitude_read_rc_setpoint_eulers(&guidance_h_rc_sp, in_flight);
     break;
+    
+  case GUIDANCE_H_MODE_HOVER_OF: //h2w
+    stabilization_attitude_read_rc_setpoint_eulers(&guidance_h_rc_sp, in_flight);
+    break;
 
   case GUIDANCE_H_MODE_NAV:
     if (radio_control.status == RC_OK) {
       stabilization_attitude_read_rc_setpoint_eulers(&guidance_h_rc_sp, in_flight);
+      guidance_h_rc_sp.psi = 0;
     }
     else {
       INT_EULERS_ZERO(guidance_h_rc_sp);
@@ -192,15 +228,16 @@ void guidance_h_run(bool_t  in_flight) {
 
   case GUIDANCE_H_MODE_HOVER:
     guidance_h_update_reference(FALSE);
-
-    /* set psi command */
-    guidance_h_command_body.psi = guidance_h_rc_sp.psi;
-    /* compute roll and pitch commands and set final attitude setpoint */
     guidance_h_traj_run(in_flight);
-
     stabilization_attitude_run(in_flight);
     break;
 
+  case GUIDANCE_H_MODE_HOVER_OF://h2w
+    guidance_h_update_reference(FALSE);
+    RunOnceEvery(20, {guidance_h_traj_run_OF(in_flight);});
+    stabilization_attitude_run(in_flight);
+    break;
+    
   case GUIDANCE_H_MODE_NAV:
     {
       if (!in_flight) guidance_h_nav_enter();
@@ -208,8 +245,6 @@ void guidance_h_run(bool_t  in_flight) {
       if (horizontal_mode == HORIZONTAL_MODE_ATTITUDE) {
         stab_att_sp_euler.phi = nav_roll;
         stab_att_sp_euler.theta = nav_pitch;
-        /* FIXME: heading can't be set via attitude block yet, use current heading for now */
-        stab_att_sp_euler.psi = ahrs.ltp_to_body_euler.psi;
 #ifdef STABILISATION_ATTITUDE_TYPE_QUAT
         INT32_QUAT_OF_EULERS(stab_att_sp_quat, stab_att_sp_euler);
         INT32_QUAT_WRAP_SHORTEST(stab_att_sp_quat);
@@ -218,14 +253,9 @@ void guidance_h_run(bool_t  in_flight) {
       else {
         INT32_VECT2_NED_OF_ENU(guidance_h_pos_sp, navigation_carrot);
 
-#if GUIDANCE_H_USE_REF
         guidance_h_update_reference(TRUE);
-#else
-        guidance_h_update_reference(FALSE);
-#endif
-        /* set psi command */
-        guidance_h_command_body.psi = nav_heading;
-        /* compute roll and pitch commands and set final attitude setpoint */
+
+        guidance_h_psi_sp = nav_heading;
         guidance_h_traj_run(in_flight);
       }
       stabilization_attitude_run(in_flight);
@@ -239,6 +269,7 @@ void guidance_h_run(bool_t  in_flight) {
 
 static inline void guidance_h_update_reference(bool_t use_ref) {
   /* convert our reference to generic representation */
+#if GUIDANCE_H_USE_REF
   if (use_ref) {
     b2_gh_update_ref_from_pos_sp(guidance_h_pos_sp);
     INT32_VECT2_RSHIFT(guidance_h_pos_ref,   b2_gh_pos_ref,   (B2_GH_POS_REF_FRAC - INT32_POS_FRAC));
@@ -249,12 +280,21 @@ static inline void guidance_h_update_reference(bool_t use_ref) {
     INT_VECT2_ZERO(guidance_h_speed_ref);
     INT_VECT2_ZERO(guidance_h_accel_ref);
   }
+#else
+  if (use_ref) {;} // we don't have a reference... just to avoid the unused arg warning in that case
+  VECT2_COPY(guidance_h_pos_ref, guidance_h_pos_sp);
+  INT_VECT2_ZERO(guidance_h_speed_ref);
+  INT_VECT2_ZERO(guidance_h_accel_ref);
+#endif
 }
 
 
 #define MAX_POS_ERR   POS_BFP_OF_REAL(16.)
 #define MAX_SPEED_ERR SPEED_BFP_OF_REAL(16.)
 #define MAX_POS_ERR_SUM ((int32_t)(MAX_POS_ERR)<< 12)
+//h2w
+#define MAX_ACCEL_ERR SPEED_BFP_OF_REAL(16.) 
+#define MAX_SPEED_ERR_SUM ((int32_t)(MAX_SPEED_ERR)<< 12)
 
 /* with a pgain of 100 and a scale of 2,
  * you get an angle of 5.6 degrees for 1m pos error */
@@ -309,10 +349,12 @@ static inline void guidance_h_traj_run(bool_t in_flight) {
   guidance_h_command_body.theta =
     - ( c_psi * guidance_h_command_earth.x + s_psi * guidance_h_command_earth.y) >> INT32_TRIG_FRAC;
 
+  guidance_h_command_body.psi = guidance_h_psi_sp;
 
-  /* Add RC roll and pitch setpoints for emergency corrections */
-  guidance_h_command_body.phi += guidance_h_rc_sp.phi;
-  guidance_h_command_body.theta += guidance_h_rc_sp.theta;
+  /* Add RC setpoint */
+  EULERS_ADD(guidance_h_command_body, guidance_h_rc_sp);
+
+  INT32_ANGLE_NORMALIZE(guidance_h_command_body.psi);
 
   /* Set attitude setpoint in eulers and as quaternion */
   EULERS_COPY(stab_att_sp_euler, guidance_h_command_body);
@@ -324,6 +366,79 @@ static inline void guidance_h_traj_run(bool_t in_flight) {
 
 }
 
+//h2w
+static inline void guidance_h_traj_run_OF(bool_t in_flight) {
+#ifdef USE_OPTFLOW_ADNS3080
+  optflow_ADNS3080_read_OF(); //read the optical flows dx dy (OF_p) and compute their derivatives ddx ddy (dOF_p)in pixels
+
+//   DOWNLINK_SEND_GUIDANCE_OF(DefaultChannel, DefaultDevice, &(OF_p.x), &(OF_p.y), &(dOF_p.x),&(dOF_p.y));
+  //RunOnceEvery(100,DOWNLINK_SEND_GUIDANCE_OF(DefaultChannel, DefaultDevice, &(OF_p.x), &(OF_p.y), &(dOF_p.x),&(dOF_p.y)));
+
+  /* compute dx dy error    */
+  VECT2_DIFF(guidance_h_OF_err, guidance_h_OF_sp, OF_p);
+
+  //TODO: guidance_h_OF_err to int32_t when OF_p is corrected for altitude effect ??
+  //as MAX_SPEED_ERR is int32_t (16*(1<<19)) = +/- 8 388 608
+
+  /* saturate it               */
+  VECT2_STRIM(guidance_h_OF_err, -MAX_SPEED_ERR, MAX_SPEED_ERR);
+
+  /* compute ddx ddy error    */
+  VECT2_DIFF(guidance_h_dOF_err, guidance_h_dOF_sp, dOF_p);
+  /* saturate it               */
+  VECT2_STRIM(guidance_h_dOF_err, -MAX_ACCEL_ERR, MAX_ACCEL_ERR);
+
+  /* update pos error integral, zero it if not in_flight */
+  if (in_flight) {
+    VECT2_ADD(guidance_h_OF_err_sum, guidance_h_OF_err);
+    /* saturate it               */
+    VECT2_STRIM(guidance_h_OF_err_sum, -MAX_SPEED_ERR_SUM, MAX_SPEED_ERR_SUM);
+  } else {
+    INT_VECT2_ZERO(guidance_h_OF_err_sum);
+  }
+
+  /* run PID */
+  guidance_h_command_earth.x =
+        (((int32_t)guidance_h_of_dgain * guidance_h_OF_err.x)
+        +((int32_t)guidance_h_of_ddgain * guidance_h_dOF_err.x)) >> INT8_OF_FRAC;
+
+  guidance_h_command_earth.y =
+          (((int32_t)guidance_h_of_dgain * guidance_h_OF_err.y)
+          +((int32_t)guidance_h_of_ddgain * guidance_h_dOF_err.y)) >> INT8_OF_FRAC;
+
+
+  VECT2_STRIM(guidance_h_command_earth, -TRAJ_MAX_BANK, TRAJ_MAX_BANK);
+
+  /* Rotate to body frame */
+  int32_t s_psi, c_psi;
+  PPRZ_ITRIG_SIN(s_psi, ahrs.ltp_to_body_euler.psi);
+  PPRZ_ITRIG_COS(c_psi, ahrs.ltp_to_body_euler.psi);
+
+  // Restore angle ref resolution after rotation
+  guidance_h_command_body.phi =
+      ( - s_psi * guidance_h_command_earth.x + c_psi * guidance_h_command_earth.y) >> INT32_TRIG_FRAC;
+  guidance_h_command_body.theta =
+    - ( c_psi * guidance_h_command_earth.x + s_psi * guidance_h_command_earth.y) >> INT32_TRIG_FRAC;
+
+  guidance_h_command_body.psi = guidance_h_psi_sp;
+
+  /* Add RC setpoint */
+  EULERS_ADD(guidance_h_command_body, guidance_h_rc_sp);
+
+  INT32_ANGLE_NORMALIZE(guidance_h_command_body.psi);
+
+  /* Set attitude setpoint in eulers and as quaternion */
+  EULERS_COPY(stab_att_sp_euler, guidance_h_command_body);
+
+  DOWNLINK_SEND_GUIDANCE_COMMANDS(DefaultChannel, DefaultDevice,&guidance_h_command_earth.x,&guidance_h_command_earth.y,&guidance_h_command_body.phi,&guidance_h_command_body.theta,&guidance_h_command_body.psi);
+  
+#ifdef STABILISATION_ATTITUDE_TYPE_QUAT
+  INT32_QUAT_OF_EULERS(stab_att_sp_quat, stab_att_sp_euler);
+  INT32_QUAT_WRAP_SHORTEST(stab_att_sp_quat);
+#endif /* STABILISATION_ATTITUDE_TYPE_QUAT */
+#endif
+}
+
 static inline void guidance_h_hover_enter(void) {
 
   VECT2_COPY(guidance_h_pos_sp, ins_ltp_pos);
@@ -333,6 +448,18 @@ static inline void guidance_h_hover_enter(void) {
 
   INT_VECT2_ZERO(guidance_h_pos_err_sum);
 
+}
+//h2w
+static inline void guidance_h_hover_enter_OF(void) {
+#ifdef USE_OPTFLOW_ADNS3080
+  INT_VECT2_ZERO(guidance_h_OF_sp);
+  INT_VECT2_ZERO(guidance_h_dOF_sp);
+  
+  guidance_h_rc_sp.psi = ahrs.ltp_to_body_euler.psi;
+  reset_psi_ref_from_body();
+
+  INT_VECT2_ZERO(guidance_h_OF_err_sum);
+#endif
 }
 
 static inline void guidance_h_nav_enter(void) {
@@ -346,7 +473,13 @@ static inline void guidance_h_nav_enter(void) {
 
   /* reset psi reference, set psi setpoint to current psi */
   reset_psi_ref_from_body();
-  nav_heading = ahrs.ltp_to_body_euler.psi;
+  guidance_h_rc_sp.psi = ahrs.ltp_to_body_euler.psi;
+  guidance_h_psi_sp = ahrs.ltp_to_body_euler.psi;
+  nav_heading = guidance_h_psi_sp;
+
+  /* set RC heading setpoint to zero,
+   * since that is added to guidance_h_psi_sp later */
+  guidance_h_rc_sp.psi = 0;
 
   INT_VECT2_ZERO(guidance_h_pos_err_sum);
 

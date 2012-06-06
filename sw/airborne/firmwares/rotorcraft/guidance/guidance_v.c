@@ -145,6 +145,11 @@ void guidance_v_mode_changed(uint8_t new_mode) {
     guidance_v_z_sum_err = 0;
     GuidanceVSetRef(ins_ltp_pos.z, ins_ltp_speed.z, 0);
     break;
+  case GUIDANCE_V_MODE_HOVER_SONAR:
+    guidance_v_z_sp = ins_ltp_pos.z; // set current altitude as setpoint
+    guidance_v_z_sum_err = 0;
+    GuidanceVSetRef(ins_ltp_pos.z, 0, 0);
+    break;
 
   default:
     break;
@@ -153,6 +158,12 @@ void guidance_v_mode_changed(uint8_t new_mode) {
 
   guidance_v_mode = new_mode;
 
+}
+
+void guidance_v_reset_sp() {
+  guidance_v_z_sp = ins_ltp_pos.z; // set current altitude as setpoint
+  guidance_v_z_sum_err = 0;
+  GuidanceVSetRef(ins_ltp_pos.z, 0, 0);
 }
 
 void guidance_v_notify_in_flight( bool_t in_flight) {
@@ -215,6 +226,21 @@ void guidance_v_run(bool_t in_flight) {
 #endif
     break;
 
+      case GUIDANCE_V_MODE_HOVER_SONAR:
+// #if USE_FMS
+//     if (fms.enabled && fms.input.v_mode == GUIDANCE_V_MODE_HOVER_SONAR)
+//       guidance_v_z_sp = fms.input.v_sp.height;
+// #endif
+    gv_update_ref_from_z_sp(guidance_v_z_sp);
+    run_hover_loop(in_flight);
+#if NO_RC_THRUST_LIMIT
+    stabilization_cmd[COMMAND_THRUST] = guidance_v_delta_t;
+#else
+    // saturate max authority with RC stick
+    stabilization_cmd[COMMAND_THRUST] = Min(guidance_v_rc_delta_t, guidance_v_delta_t);
+#endif
+    break;
+    
   case GUIDANCE_V_MODE_NAV:
     {
       if (vertical_mode == VERTICAL_MODE_ALT) {

@@ -38,6 +38,7 @@
 #define GUIDANCE_H_MODE_HOVER       3
 #define GUIDANCE_H_MODE_NAV         4
 #define GUIDANCE_H_MODE_RC_DIRECT   5
+#define GUIDANCE_H_MODE_HOVER_OF    6
 
 
 extern uint8_t guidance_h_mode;
@@ -48,6 +49,10 @@ extern uint8_t guidance_h_mode;
  */
 extern struct Int32Vect2 guidance_h_pos_sp;
 
+extern struct Int8Vect2 guidance_h_OF_sp; //h2w: optic flows
+extern struct Int8Vect2 guidance_h_dOF_sp; //h2w: derivatives of optic flow
+
+extern int32_t           guidance_h_psi_sp;      ///< with #INT32_ANGLE_FRAC
 extern struct Int32Vect2 guidance_h_pos_ref;
 extern struct Int32Vect2 guidance_h_speed_ref;
 extern struct Int32Vect2 guidance_h_accel_ref;
@@ -55,6 +60,9 @@ extern struct Int32Vect2 guidance_h_accel_ref;
 extern struct Int32Vect2 guidance_h_pos_err;
 extern struct Int32Vect2 guidance_h_speed_err;
 extern struct Int32Vect2 guidance_h_pos_err_sum;
+extern struct Int8Vect2 guidance_h_OF_err; //h2w
+extern struct Int8Vect2 guidance_h_dOF_err; //h2w
+extern struct Int32Vect2 guidance_h_OF_err_sum;//h2w
 extern struct Int32Vect2 guidance_h_nav_err;
 
 extern struct Int32Eulers guidance_h_rc_sp;         ///< with #INT32_ANGLE_FRAC
@@ -63,6 +71,8 @@ extern struct Int32Eulers guidance_h_command_body;  ///< with #INT32_ANGLE_FRAC
 
 extern int32_t guidance_h_pgain;
 extern int32_t guidance_h_dgain;
+extern uint8_t guidance_h_of_dgain; //h2w
+extern uint8_t guidance_h_of_ddgain; //h2w
 extern int32_t guidance_h_igain;
 extern int32_t guidance_h_again;
 
@@ -71,7 +81,6 @@ extern void guidance_h_init(void);
 extern void guidance_h_mode_changed(uint8_t new_mode);
 extern void guidance_h_read_rc(bool_t  in_flight);
 extern void guidance_h_run(bool_t  in_flight);
-
 
 #define guidance_h_SetKi(_val) {			\
     guidance_h_igain = _val;			\

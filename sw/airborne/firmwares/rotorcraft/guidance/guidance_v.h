@@ -51,6 +51,7 @@
 #define GUIDANCE_V_MODE_CLIMB     3
 #define GUIDANCE_V_MODE_HOVER     4
 #define GUIDANCE_V_MODE_NAV       5
+#define GUIDANCE_V_MODE_HOVER_SONAR 6
 
 extern uint8_t guidance_v_mode;
 
@@ -106,6 +107,7 @@ extern int32_t guidance_v_ki; ///< vertical control I-gain
 extern void guidance_v_init(void);
 extern void guidance_v_read_rc(void);
 extern void guidance_v_mode_changed(uint8_t new_mode);
+extern void guidance_v_reset_sp(void);
 extern void guidance_v_notify_in_flight(bool_t in_flight);
 extern void guidance_v_run(bool_t in_flight);
 
