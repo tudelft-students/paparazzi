@@ -1,0 +1,17 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="opticflow_ADNS3080" dir="opticflow">
+  <header>
+    <file name="opticflow_ADNS3080.h"/>
+    <file name="../../subsystems/ins.h"/>
+  </header>
+  <init fun="optflow_ADNS3080_init()"/>
+  <!--<periodic fun="optflow_ADNS3080_periodic()" freq="100" autorun="TRUE"/>-->
+    <!--<event fun="OpticFlowEvent(ins_update_opticflow)"/>-->
+  <makefile target="ap">
+    <file name="opticflow_ADNS3080_Sonar.c"/>
+    <define name="USE_OPTFLOW_ADNS3080"/>
+<!--     <define name="USE_HFF"/> -->
+  </makefile>
+</module>
+
