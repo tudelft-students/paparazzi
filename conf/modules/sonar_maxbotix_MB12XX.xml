@@ -1,0 +1,18 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+<!-- Currently only available on STM32 arch
+    Reads out maxbotics sonars PWM output using a TIM
+-->
+<module name="sonar">
+  <header>
+    <file name="sonar_maxbotix_MB12XX_PWM.h"/>
+  </header>
+  <init fun="maxbotix12_init()"/>
+   <event fun="SonarEvent(ins_update_sonar)"/>
+  <makefile>
+    <file name="sonar_maxbotix_MB12XX_PWM.c"/>
+    <define name="USE_TIM1_IRQ"/>
+    <define name="USE_VFF"/>
+    <define name="USE_INS_ALTIMETER_FROM_MODULE"/>
+  </makefile>
+
+</module>
