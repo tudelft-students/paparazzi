@@ -44,6 +44,10 @@
 #include <stdio.h>
 #endif
 
+//h2w: opticflow modules
+#if USE_OPTFLOW_ADNS3080
+#include "modules/opticflow/opticflow_ADNS3080.h"
+#endif
 
 #include "math/pprz_geodetic_int.h"
 
@@ -54,6 +58,13 @@ struct LtpDef_i  ins_ltp_def;
          bool_t  ins_ltp_initialised;
 struct NedCoor_i ins_gps_pos_cm_ned;
 struct NedCoor_i ins_gps_speed_cm_s_ned;
+
+// h2w: Opticflow horizontal positions and speeds in meters as float
+#if USE_OPTFLOW_ADNS3080 && USE_HFF
+struct FloatVect2 ins_of_pos_m;
+struct FloatVect2 ins_of_speed_m_s;
+#endif
+
 #if USE_HFF
 /* horizontal gps transformed to NED in meters as float */
 struct FloatVect2 ins_gps_pos_m_ned;
@@ -70,8 +81,15 @@ int32_t ins_baro_alt;
 bool_t  ins_update_on_agl;
 int32_t ins_sonar_offset;
 #endif
+#if USE_INS_ALTIMETER_FROM_MODULE
+//int32_t ins_ext_alt_qfe;
+bool_t  ins_ext_alt_active;
+int32_t ins_ext_alt;
+#endif
 #endif
 bool_t  ins_vf_realign;
+
+bool_t ins_do_gv_reset;
 
 /* output                      */
 struct NedCoor_i ins_ltp_pos;
@@ -105,6 +123,10 @@ void ins_init() {
   ins_baro_initialised = FALSE;
 #if USE_SONAR
   ins_update_on_agl = FALSE;
+#endif
+#if USE_INS_ALTIMETER_FROM_MODULE
+  ins_ext_alt_active = FALSE;
+  ins_qfe = 0;
 #endif
   vff_init(0., 0., 0.);
 #endif
@@ -148,7 +170,11 @@ void ins_propagate() {
 
 #if USE_VFF
   float z_accel_meas_float = ACCEL_FLOAT_OF_BFP(accel_meas_ltp.z);
+#if USE_INS_ALTIMETER_FROM_MODULE
+  if ((baro.status == BS_RUNNING && ins_baro_initialised) || ins_ext_alt_active) {
+#else
   if (baro.status == BS_RUNNING && ins_baro_initialised) {
+#endif
     vff_propagate(z_accel_meas_float);
     ins_ltp_accel.z = ACCEL_BFP_OF_REAL(vff_zdotdot);
     ins_ltp_speed.z = SPEED_BFP_OF_REAL(vff_zdot);
@@ -177,12 +203,18 @@ void ins_propagate() {
 
 void ins_update_baro() {
 #if USE_VFF
+#if USE_INS_ALTIMETER_FROM_MODULE
+  if (ins_ext_alt_active)
+       return;
+#endif
   if (baro.status == BS_RUNNING) {
     if (!ins_baro_initialised) {
       ins_qfe = baro.absolute;
       ins_baro_initialised = TRUE;
     }
-    if (ins_vf_realign) {
+    ins_baro_alt = ((baro.absolute - ins_qfe) * INS_BARO_SENS_NUM)/INS_BARO_SENS_DEN;
+    float alt_float = POS_FLOAT_OF_BFP(ins_baro_alt);
+    if (ins_vf_realign || ins_do_gv_reset) {
       ins_vf_realign = FALSE;
       ins_qfe = baro.absolute;
 #if USE_SONAR
@@ -196,12 +228,40 @@ void ins_update_baro() {
       ins_enu_speed.z = -ins_ltp_speed.z;
       ins_enu_accel.z = -ins_ltp_accel.z;
     }
-    else { /* not realigning, so normal update with baro measurement */
-      ins_baro_alt = ((baro.absolute - ins_qfe) * INS_BARO_SENS_NUM)/INS_BARO_SENS_DEN;
-      float alt_float = POS_FLOAT_OF_BFP(ins_baro_alt);
-      vff_update(alt_float);
+    vff_update(alt_float);
+    if (ins_do_gv_reset) {
+        guidance_v_reset_sp();
+        ins_do_gv_reset=FALSE;
     }
   }
+#endif
+}
+
+void ins_update_module_altimeter() {
+#if USE_VFF
+#if USE_INS_ALTIMETER_FROM_MODULE
+  if (ins_ext_alt_active) {
+//  ins_ext_alt_qfe = 0;
+//  ins_ext_alt = ((baro.absolute - ins_ext_alt_qfe) * INS_BARO_SENS_NUM)/INS_BARO_SENS_DEN;
+    float alt_float = POS_FLOAT_OF_BFP(ins_ext_alt);
+    if (ins_vf_realign || ins_do_gv_reset) {
+      ins_vf_realign = FALSE;
+    //ins_ext_alt_qfe = 0;
+      vff_realign(0.);
+      ins_ltp_accel.z = ACCEL_BFP_OF_REAL(vff_zdotdot);
+      ins_ltp_speed.z = SPEED_BFP_OF_REAL(vff_zdot);
+      ins_ltp_pos.z   = POS_BFP_OF_REAL(vff_z);
+      ins_enu_pos.z = -ins_ltp_pos.z;
+      ins_enu_speed.z = -ins_ltp_speed.z;
+      ins_enu_accel.z = -ins_ltp_accel.z;
+    }
+    vff_update(alt_float);
+    if (ins_do_gv_reset) {
+        guidance_v_reset_sp();
+        ins_do_gv_reset=FALSE;
+    }
+  }
+#endif
 #endif
 }
 
@@ -263,6 +323,26 @@ void ins_update_gps(void) {
     INT32_VECT3_ENU_OF_NED(ins_enu_accel, ins_ltp_accel);
   }
 #endif /* USE_GPS */
+}
+
+void ins_update_opticflow(void) {
+#if USE_OPTFLOW_ADNS3080
+#if USE_HFF
+    ins_of_pos_m.x = x_of_m;
+    ins_of_pos_m.y = y_of_m;
+    ins_of_speed_m_s.x = dx_fused;
+    ins_of_speed_m_s.y = dy_fused;
+
+    b2_hff_update_opticflow(); //hf_float_h2w.c
+    
+#else 
+
+//     ins_ltp_pos.x = ofs_itgr_x;
+//     ins_ltp_pos.y = ofs_itgr_x;
+    ins_ltp_speed.x = (int32_t)dx;
+    ins_ltp_speed.y = (int32_t)dy;
+#endif
+#endif /* USE_OPTFLOW_ADNS3080 */
 }
 
 void ins_update_sonar() {

@@ -114,7 +114,7 @@ maxbotix12_init(void)
   /* we can use TI2FP2 because it is bound to TIM channel 2 , which we are using */
   TIM_SelectInputTrigger(SONAR_MAXBOTIX12_TIM, SONAR_MAXBOTIX12_TIM_TS);
 
-  TIM_SelectSlaveMode(SONAR_MAXBOTIX12_TIM, TIM_SlaveMode_);
+  TIM_SelectSlaveMode(SONAR_MAXBOTIX12_TIM, TIM_SlaveMode_Reset);
   TIM_SelectMasterSlaveMode(SONAR_MAXBOTIX12_TIM, TIM_MasterSlaveMode_Enable);
 
   /* TIM3 enable counter */

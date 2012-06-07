@@ -481,6 +481,30 @@ void b2_hff_propagate(void) {
   }
 }
 
+
+//h2w: Opticflow update
+b2_hff_update_opticflow(void){
+  b2_hff_lost_counter = 0;
+
+    /* update filter state with measurement */
+    b2_hff_update_x(&b2_hff_state, ins_of_pos_m.x, Rgps_pos);
+    b2_hff_update_y(&b2_hff_state, ins_of_pos_m.y, Rgps_pos);
+    
+// #ifdef HFF_UPDATE_SPEED
+    b2_hff_update_xdot(&b2_hff_state, ins_of_speed_m_s.x, Rgps_vel);
+    b2_hff_update_ydot(&b2_hff_state, ins_of_speed_m_s.y, Rgps_vel);
+// #endif
+
+    /* update ins state */
+    ins_ltp_accel.x = ACCEL_BFP_OF_REAL(b2_hff_state.xdotdot);
+    ins_ltp_accel.y = ACCEL_BFP_OF_REAL(b2_hff_state.ydotdot);
+    ins_ltp_speed.x = SPEED_BFP_OF_REAL(b2_hff_state.xdot);
+    ins_ltp_speed.y = SPEED_BFP_OF_REAL(b2_hff_state.ydot);
+    ins_ltp_pos.x   = POS_BFP_OF_REAL(b2_hff_state.x);
+    ins_ltp_pos.y   = POS_BFP_OF_REAL(b2_hff_state.y);
+}
+
+
 void b2_hff_update_gps(void) {
   b2_hff_lost_counter = 0;
 

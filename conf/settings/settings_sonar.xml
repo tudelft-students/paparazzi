@@ -1,0 +1,12 @@
+<!DOCTYPE settings SYSTEM "settings.dtd">
+
+<settings>
+  <dl_settings>
+
+    <dl_settings NAME="Sonar">
+      <dl_setting var="ins_ext_alt_active" min="0" step="1" max="1" module="subsystems/ins" values="BARO|SONAR" handler="SwitchExtAltimeter"/>
+    </dl_settings>
+    
+  </dl_settings>
+</settings>
+    

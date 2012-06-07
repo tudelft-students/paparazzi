@@ -1767,19 +1767,69 @@
     <field name="diff"         type="int32"/>
   </message>
 
- <!--222 is free -->
- <!--223 is free -->
- <!--224 is free -->
- <!--225 is free -->
- <!--226 is free -->
+  <message name="SONAR_Z" id="222">
+    <field name="sonar_meas" type="int16" alt_unit="m" alt_unit_coef="0.0039063"/>
+  <field name="sonar_filtered" type="int32" alt_unit="m" alt_unit_coef="0.0039063"/>
+ </message>
+
+  <message name="OFLOW_DBG" id="223">
+  <field name="prodId" type="uint8"/>
+  <field name="revId" type="uint8"/>
+  <field name="isMotion" type="uint8"/>
+  <field name="motionOverflow" type="uint8"/>
+  <field name="motionResolution" type="uint8"/>
+  <field name="dx" type="int8"/>
+  <field name="dy" type="int8"/>
+  <field name="squal" type="uint8" alt_unit="real" alt_unit_coef=" #features"/>
+  <field name="srom_id" type="uint8"/>
+ </message>
+
+ <message name="OFLOW_FRAMECAP" id="224">
+  <field name="frameData" type="uint8[]"/>
+ </message>
+ 
+ 
+ <message name="OFLOW_DATA" id="225">
+  <field name="dx" type="int8" alt_unit="pixel" />
+  <field name="dy" type="int8" alt_unit="pixel" />
+  <!-- <field name="dx_fused" type="float" alt_unit="m" />--> <!--0.0139882(IMU)*0.0039063(dx_scaled)=0.000054642 -->
+<!-- <field name="dy_fused" type="float" alt_unit="m" />
+<field name="dx_scaled" type="float" alt_unit="m" />
+<field name="dy_scaled" type="float" alt_unit="m" />-->
+<!-- <field name="dx_scaled" type="int8" alt_unit="pixel" />
+<field name="dy_scaled" type="int8" alt_unit="pixel" />-->
+<!-- <field name="dx_scaled" type="int32" alt_unit="m" alt_unit_coef="0.0039063" />
+<field name="dy_scaled" type="int32" alt_unit="m" alt_unit_coef="0.0039063" />-->
+  <field name="squal" type="uint8" alt_unit="real" alt_unit_coef=" #features"/>
+ </message>
+
+ <message name="OFLOW_FILTERED" id="226">
+  <field name="dx_filtered" type="float" alt_unit="pixel" />
+  <field name="dy_filtered" type="float" alt_unit="pixel" />
+  <field name="squal" type="uint8" alt_unit="real" alt_unit_coef=" #features"/>
+ </message>
 
   <message name="TIME" id="227">
     <field name="t" type="uint32"/>
   </message>
 
- <!--228 is free -->
- <!--229 is free -->
- <!--230 is free -->
+
+  <message name="GUIDANCE_COMMANDS" id="228">
+    <field name="h_command_earth_x" type="int32"/>
+    <field name="h_command_earth_y" type="int32"/>
+    <field name="h_command_body_phi" type="int32"/>
+    <field name="h_command_body_theta" type="int32"/>
+    <field name="h_command_body_psi" type="int32"/>
+  </message>
+  
+   <message name="GUIDANCE_OF" id="229">
+    <field name="OF_p_x" type="int8"/>
+    <field name="OF_p_y" type="int8"/>
+    <field name="dOF_p_x" type="int8"/>
+    <field name="dOF_p_y" type="int8"/>
+  </message>
+ 
+<!--230 is free -->
 
   <message name="ROTORCRAFT_STATUS" id="231">
     <field name="link_imu_nb_err" type="uint32"/>

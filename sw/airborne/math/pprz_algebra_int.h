@@ -36,6 +36,11 @@
 #include "math/pprz_trig_int.h"
 #include <stdlib.h>
 
+struct Int8Vect2 {
+  int8_t x;
+  int8_t y;
+};
+
 struct Uint16Vect3 {
   uint16_t x;
   uint16_t y;

@@ -25,6 +25,7 @@
 #include "std.h"
 #include "math/pprz_geodetic_int.h"
 #include "math/pprz_algebra_float.h"
+#include "guidance/guidance_v.h"
 
 /* gps transformed to LTP-NED  */
 extern struct LtpDef_i  ins_ltp_def;
@@ -41,7 +42,14 @@ extern bool_t  ins_baro_initialised;
 extern bool_t  ins_update_on_agl; /* use sonar to update agl if available */
 extern int32_t ins_sonar_offset;
 #endif
+#if USE_INS_ALTIMETER_FROM_MODULE
+//int32_t ins_ext_alt_qfe;
+extern bool_t  ins_ext_alt_active;
+extern int32_t ins_ext_alt;
 #endif
+#endif
+
+#define ins_SwitchExtAltimeter(_x) { ins_ext_alt_active = _x; ins_do_gv_reset = TRUE;}
 
 /* output LTP NED               */
 extern struct NedCoor_i ins_ltp_pos;
@@ -59,7 +67,7 @@ extern struct FloatVect2 ins_gps_speed_m_s_ned;
 
 extern bool_t ins_hf_realign;
 extern bool_t ins_vf_realign;
-
+extern bool_t ins_do_gv_reset;
 extern void ins_init( void );
 extern void ins_periodic( void );
 extern void ins_realign_h(struct FloatVect2 pos, struct FloatVect2 speed);
@@ -67,7 +75,9 @@ extern void ins_realign_v(float z);
 extern void ins_propagate( void );
 extern void ins_update_baro( void );
 extern void ins_update_gps( void );
+extern void ins_update_opticflow(void);//h2w
 extern void ins_update_sonar( void );
+extern void ins_update_module_altimeter( void );
 
 
 #endif /* INS_H */
