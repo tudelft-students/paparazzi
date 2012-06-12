@@ -10,13 +10,21 @@
 -->
 
 <airframe name="tudelft_noarmsquad">
-
+<!--
   <servos min="0" neutral="0" max="0xff">
     <servo name="FRONT"   no="0" min="0" neutral="0" max="255"/>
     <servo name="BACK"    no="1" min="0" neutral="0" max="255"/>
     <servo name="LEFT"    no="2" min="0" neutral="0" max="255"/>
     <servo name="RIGHT"   no="3" min="0" neutral="0" max="255"/>
   </servos>
+ -->
+   <servos min="0" neutral="0" max="0xff">
+    <servo name="FRONT"   no="0" min="1000" neutral="1000" max="2000"/>
+    <servo name="BACK"    no="1" min="1000" neutral="1000" max="2000"/>
+    <servo name="LEFT"    no="2" min="1000" neutral="1000" max="2000"/>
+    <servo name="RIGHT"   no="3" min="1000" neutral="1000" max="2000"/>
+  </servos>
+ 
 
   <commands>
     <axis name="PITCH"  failsafe_value="0"/>
@@ -25,14 +33,17 @@
     <axis name="THRUST" failsafe_value="0"/>
   </commands>
 
+<command_laws>
+</command_laws>
+
   <section name="ACTUATORS_MKK" prefix="ACTUATORS_MKK_">
     <define name="NB" value="4"/>
     <define name="ADDR" value="{ 0x52, 0x54, 0x56, 0x58 }"/>
   </section>
 
   <section name="SUPERVISION" prefix="SUPERVISION_">
-    <define name="MIN_MOTOR" value="10"/>
-    <define name="MAX_MOTOR" value="256"/>
+    <define name="MIN_MOTOR" value="1220"/>
+    <define name="MAX_MOTOR" value="2030"/>
     <define name="TRIM_A" value="0"/>
     <define name="TRIM_E" value="0"/>
     <define name="TRIM_R" value="0"/>
@@ -42,6 +53,7 @@
     <define name="PITCH_COEF"  value="{  256, -256, -256,  256 }"/>
     <define name="YAW_COEF"    value="{ -256, -256,  256,  256 }"/>
     <define name="THRUST_COEF" value="{  256,  256,  256,  256 }"/>
+    <define name="STOP_MOTOR" value="1000"/> <!-- send 1ms pulses on kill -->
   </section>
 
   <section name="IMU" prefix="IMU_">
@@ -261,10 +273,12 @@
     <define name="USE_GPS_ACC4R"/>
     <target name="ap" board="lisa_l_1.1">
       <subsystem name="radio_control" type="ppm"/>
-      <subsystem name="actuators"     type="mkk"/>
+      <subsystem name="actuators"     type="pwm_supervision"/>
         <define name="AUTOPILOT_ARMING_KILL_SWITCH"/>
         <define name="RADIO_KILL_SWITCH" value="RADIO_FLAPS"/>
         <define name="ACTUATORS_START_DELAY" value="3"/>
+      <define name="SERVO_HZ" value="400"/>
+      <define name="SERVO_HZ_SECONDARY" value="40"/>
     </target>
     <target name="sim" board="pc">
       <subsystem name="fdm"           type="nps"/>
@@ -274,7 +288,7 @@
 <!--        <configure name="MODEM_BAUD"    value="B57600"/>
         <configure name="MODEM_PORT"    value="UART2"/>-->
       </subsystem>
-    <subsystem name="imu" type="b2_v1.1"/>
+    <subsystem name="imu" type="aspirin_v2.0"/>
     <subsystem name="gps"           type="ublox">
       <configure name="GPS_PORT"    value="UART3"/>
     </subsystem>
