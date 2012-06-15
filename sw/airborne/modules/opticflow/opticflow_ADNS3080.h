@@ -95,7 +95,7 @@
 
 //field of view in radians
 #define OFS_FOV RadOfDeg(11.0f)
-#define ANGLE_TO_OFS_VAL  128/(ANGLE_BFP_OF_REAL(OFS_VOF))
+#define ANGLE_TO_OFS_VAL  128/(ANGLE_BFP_OF_REAL(OFS_FOV))
 
 #include "math/pprz_algebra_int.h"
 
@@ -125,8 +125,11 @@ extern float dy_scaled;
 extern float dx_fused;
 extern float dy_fused;
 
-extern struct Int32Eulers previous_attitude;
+extern struct Int32Vect2 previous_attitude;
+extern struct Int32Vect2 attitude_diff;
+extern struct Int32Vect2 rate_induced_of ;
 
+extern struct Int32Vect2 actual_of_displ;
 
 #define OpticFlowEvent(_handler) { \
   if (opticflow_data_available) { \

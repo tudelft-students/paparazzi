@@ -452,6 +452,8 @@ static inline void guidance_h_hover_enter(void) {
 //h2w
 static inline void guidance_h_hover_enter_OF(void) {
 #ifdef USE_OPTFLOW_ADNS3080
+  ins_ext_alt_active = TRUE;
+  ins_SwitchExtAltimeter(1);
   INT_VECT2_ZERO(guidance_h_OF_sp);
   INT_VECT2_ZERO(guidance_h_dOF_sp);
   

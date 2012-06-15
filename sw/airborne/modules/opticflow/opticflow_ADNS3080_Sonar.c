@@ -23,6 +23,7 @@
 #include "subsystems/imu.h"
 #include "subsystems/ahrs.h"
 #include "math/pprz_algebra.h"
+#include "subsystems/ins.h"
 
 #include <stm32/gpio.h>
 #include <stm32/misc.h>
@@ -92,6 +93,11 @@ int8_t ddy = 0;
 
 struct Int8Vect2 OF_p;
 struct Int8Vect2 dOF_p;
+
+struct Int32Vect2 attitude_diff;
+struct Int32Vect2 rate_induced_of ;
+
+struct Int32Vect2 actual_of_displ;
 
 void optflow_ADNS3080_init( void ) {
 	opticflow_data_available = FALSE;
@@ -265,14 +271,9 @@ void optflow_ADNS3080_periodic( void ) {
      	  struct Int8Vect2 of_scaled_dot;
      	  VECT2_ASSIGN(of_scaled_dot,dx_scaled,dy_scaled);
 
-     	  //comp for rot
-     	  struct Int32Vect2 attitude_diff;
-     	  struct Int16Vect2 rate_induced_of ;
 
-     	  struct Int16Vect2 actual_of_displ;
-
-          attitude_diff.x = ahrs.ltp_to_body_euler.phi - previous_attitude.x;
-          attitude_diff.y = ahrs.ltp_to_body_euler.theta - previous_attitude.y;
+          attitude_diff.y = ahrs.ltp_to_body_euler.phi - previous_attitude.x;
+          attitude_diff.x = ahrs.ltp_to_body_euler.theta - previous_attitude.y;
 
           VECT2_SMUL(rate_induced_of,attitude_diff,ANGLE_TO_OFS_VAL);
 
@@ -283,8 +284,8 @@ void optflow_ADNS3080_periodic( void ) {
      	  VECT2_ASSIGN(previous_attitude,ahrs.ltp_to_body_euler.phi,ahrs.ltp_to_body_euler.theta);
 
 
-     	  dx_scaled = actual_of_displ.x;
-     	  dy_scaled = actual_of_displ.y;
+     	  dx_scaled = (int8_t)(((int32_t)actual_of_displ.x*ins_enu_pos.z)>>8);
+     	  dy_scaled = (int8_t)(((int32_t)actual_of_displ.y*ins_enu_pos.z)>>8);
 
 
 //#ifdef SONAR_MAXBOTIX12_H
@@ -305,7 +306,12 @@ void optflow_ADNS3080_periodic( void ) {
 // 	      
  	     // 	  RunOnceEvery(50,DOWNLINK_SEND_OFLOW_DATA(DefaultChannel, DefaultDevice, &dx, &dy,&squal););
  	     //	      DOWNLINK_SEND_OFLOW_DATA(DefaultChannel, DefaultDevice, &dx, &dy, &squal);
- 	      DOWNLINK_SEND_OFLOW_FILTERED(DefaultChannel, DefaultDevice, &dx_scaled, &dy_scaled, &squal);
+
+
+
+     	  float meas_raw = -ofs_filter_val_dy;
+     	  DOWNLINK_SEND_OFLOW_FILTERED(DefaultChannel, DefaultDevice, &dx_scaled, &meas_raw, &squal);
+     	  //DOWNLINK_SEND_RMAT_DEBUG(DefaultChannel, DefaultDevice, &dx_scaled, &meas_raw, &imu_comp, &squal, 0,0,0,0,0);
 
  	      opticflow_data_available = TRUE;
 //h2w
