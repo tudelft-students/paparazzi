@@ -93,6 +93,10 @@
 #define OFS_BUTTER_DEN_2 -0.699738028273365
 #define OFS_BUTTER_DEN_3 +0.259495175740772
 
+//field of view in radians
+#define OFS_FOV RadOfDeg(11.0f)
+#define ANGLE_TO_OFS_VAL  128/(ANGLE_BFP_OF_REAL(OFS_VOF))
+
 #include "math/pprz_algebra_int.h"
 
 void optflow_ADNS3080_init(void);
@@ -120,6 +124,9 @@ extern float dx_scaled;
 extern float dy_scaled;
 extern float dx_fused;
 extern float dy_fused;
+
+extern struct Int32Eulers previous_attitude;
+
 
 #define OpticFlowEvent(_handler) { \
   if (opticflow_data_available) { \

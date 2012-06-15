@@ -8,7 +8,6 @@
  * compensate for altitude
  * compensate for pitch/roll
  * ignore bad-quality measurements
- * include butterworth filter
  */
 #include "std.h"
 #include "modules/opticflow/opticflow_ADNS3080.h"
@@ -61,6 +60,9 @@ uint8_t squal;
 int8_t dx,dy;
 int8_t dx_filtered = 0;
 int8_t dy_filtered = 0;
+
+struct Int32Vect2 previous_attitude;
+
 #define FORTYFIVE_DEGREES 0.78539816
 
 float dx_scaled = 0;
@@ -135,6 +137,8 @@ void optflow_ADNS3080_init( void ) {
         sys_time_usleep(OPTFLOW_ADNS3080_US_BETWEEN_WRITES);
         optflow_ADNS3080_writeRegister(OPTFLOW_ADNS3080_ADDR_FP_MAX_B_UP,OPTFLOW_ADNS3080_FP_UP_5000);
         sys_time_usleep(OPTFLOW_ADNS3080_US_BETWEEN_WRITES);*/
+
+   VECT2_ASSIGN(previous_attitude,ahrs.ltp_to_body_euler.phi,ahrs.ltp_to_body_euler.theta);
 }
 
 void optflow_ADNS3080_spi_conf( void ) {
@@ -253,8 +257,35 @@ void optflow_ADNS3080_periodic( void ) {
 // 	      change_x = ofs_filter_val_dx - exp_change_x;
 // 	      change_y = ofs_filter_val_dy - exp_change_y;
 // 	      
+
      	  dx_scaled = -ofs_filter_val_dy;
      	  dy_scaled = -ofs_filter_val_dx;
+
+
+     	  struct Int8Vect2 of_scaled_dot;
+     	  VECT2_ASSIGN(of_scaled_dot,dx_scaled,dy_scaled);
+
+     	  //comp for rot
+     	  struct Int32Vect2 attitude_diff;
+     	  struct Int16Vect2 rate_induced_of ;
+
+     	  struct Int16Vect2 actual_of_displ;
+
+          attitude_diff.x = ahrs.ltp_to_body_euler.phi - previous_attitude.x;
+          attitude_diff.y = ahrs.ltp_to_body_euler.theta - previous_attitude.y;
+
+          VECT2_SMUL(rate_induced_of,attitude_diff,ANGLE_TO_OFS_VAL);
+
+          VECT2_DIFF(actual_of_displ,of_scaled_dot,rate_induced_of);
+
+          VECT2_STRIM(actual_of_displ,-127,127);
+
+     	  VECT2_ASSIGN(previous_attitude,ahrs.ltp_to_body_euler.phi,ahrs.ltp_to_body_euler.theta);
+
+
+     	  dx_scaled = actual_of_displ.x;
+     	  dy_scaled = actual_of_displ.y;
+
 
 //#ifdef SONAR_MAXBOTIX12_H
 // 	      dx_scaled = ofs_filter_val_dx*sonar_filtered*conv_factor;
