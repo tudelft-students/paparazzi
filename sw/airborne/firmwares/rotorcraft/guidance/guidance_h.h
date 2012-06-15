@@ -71,8 +71,8 @@ extern struct Int32Eulers guidance_h_command_body;  ///< with #INT32_ANGLE_FRAC
 
 extern int32_t guidance_h_pgain;
 extern int32_t guidance_h_dgain;
-extern uint8_t guidance_h_of_dgain; //h2w
-extern uint8_t guidance_h_of_ddgain; //h2w
+extern int8_t guidance_h_of_dgain; //h2w
+extern int8_t guidance_h_of_ddgain; //h2w
 extern int32_t guidance_h_igain;
 extern int32_t guidance_h_again;
 

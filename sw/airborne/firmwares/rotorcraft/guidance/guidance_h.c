@@ -70,8 +70,8 @@ int32_t guidance_h_igain;
 int32_t guidance_h_again;
 
 //h2w
-uint8_t guidance_h_of_dgain;
-uint8_t guidance_h_of_ddgain;
+int8_t guidance_h_of_dgain;
+int8_t guidance_h_of_ddgain;
 #define INT8_OF_FRAC 2
 //INT8_OF_FRAC supposed to be 5
 
